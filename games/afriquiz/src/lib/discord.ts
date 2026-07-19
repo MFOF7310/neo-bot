@@ -15,7 +15,7 @@ let sdk: DiscordSDK | null = null;
 
 /**
  * Full Embedded App SDK handshake:
- * ready() -> authorize() -> /api/token (code exchange) -> authenticate()
+ * ready() -> authorize() -> /neo/api/token (code exchange) -> authenticate()
  * Falls back to a demo user when running outside Discord (dev/preview).
  */
 export async function initDiscord(): Promise<GameUser> {
@@ -41,7 +41,7 @@ export async function initDiscord(): Promise<GameUser> {
     scope: ['identify', 'guilds'],
   });
 
-  const tokenRes = await fetch('/api/token', {
+  const tokenRes = await fetch('/neo/api/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
