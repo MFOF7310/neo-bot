@@ -1,0 +1,32 @@
+{
+  "name": "neo-bot",
+  "version": "1.0.0",
+  "description": "NEO — Discord.js v14 bot featuring AfriQuiz, a bilingual (FR/EN) Africa-themed trivia game",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js && node --check plugins/afriquiz.js && node --check lib/db.js && node --check lib/questions.js && node --check scripts/seed.js",
+    "seed": "node scripts/seed.js",
+    "register": "node scripts/register.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "better-sqlite3": "^11.10.0",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "quiz",
+    "africa",
+    "trivia",
+    "bilingual"
+  ],
+  "author": "MFOF7310",
+  "license": "MIT"
+}
