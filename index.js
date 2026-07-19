@@ -12,8 +12,8 @@
 
 require('dotenv').config({ path: ['.env', 'config.env'] });
 
-const http = require('http');
 const path = require('path');
+const { createApiServer } = require('./lib/api-server');
 const { Client, GatewayIntentBits, Events, REST, Routes } = require('discord.js');
 
 const afriquiz = require('./plugins/afriquiz');
@@ -79,22 +79,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-/* ── Health-check server (port 5003) ────────────────────────────── */
+/* ── HTTP + API server (port 5003) ────────────────────────────────
+   /health, /api/quiz/question, /api/quiz/answer,
+   /api/quiz/leaderboard, /api/token (see lib/api-server.js)        */
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'ok',
-      bot: client.user ? client.user.tag : 'starting',
-      uptime: Math.round(process.uptime()),
-    }));
-  } else {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('NEO is alive 🦅');
-  }
-});
-server.listen(PORT, () => console.log(`[NEO] HTTP health server listening on port ${PORT}`));
+const server = createApiServer(client);
+server.listen(PORT, () => console.log(`[NEO] HTTP + API server listening on port ${PORT}`));
 
 /* ── Graceful shutdown (PM2) ────────────────────────────────────── */
 
