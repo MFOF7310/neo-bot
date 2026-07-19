@@ -7,7 +7,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api/
 const DEMO_QUESTIONS: QuizQuestion[] = [
   {
     id: -1, category: 'geo', difficulty: 'easy',
-    question: 'Quelle est la capitale du Mali ? / What is the capital of Mali?',
+    question: 'Quelle est la capitale du Mali ?',
     options: [
       { letter: 'a', text: 'Bamako' },
       { letter: 'b', text: 'Dakar' },
@@ -17,7 +17,7 @@ const DEMO_QUESTIONS: QuizQuestion[] = [
   },
   {
     id: -2, category: 'hist', difficulty: 'medium',
-    question: 'Mansa Moussa était empereur de… / Mansa Musa was emperor of…',
+    question: 'Mansa Moussa était empereur de…',
     options: [
       { letter: 'a', text: 'Ghana' },
       { letter: 'b', text: 'Mali' },
@@ -27,7 +27,7 @@ const DEMO_QUESTIONS: QuizQuestion[] = [
   },
   {
     id: -3, category: 'music', difficulty: 'easy',
-    question: 'De quel pays vient Salif Keita ? / Where is Salif Keita from?',
+    question: 'De quel pays vient Salif Keita ?',
     options: [
       { letter: 'a', text: 'Sénégal / Senegal' },
       { letter: 'b', text: 'Guinée / Guinea' },
