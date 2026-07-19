@@ -20,11 +20,19 @@ if (!DISCORD_TOKEN || !CLIENT_ID) {
 (async () => {
   const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
   if (GUILD_ID) {
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: afriquiz.commands });
+    // Fetch existing commands to preserve Entry Point
+const existing = await rest.get(Routes.applicationCommands(CLIENT_ID));
+const entryPoint = existing.find(c => c.type === 4); // CHAT_INPUT Entry Point
+const entryPointCmd = entryPoint ? [entryPoint] : [];
+
+await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: afriquiz.commands });
     console.log(`✅ ${afriquiz.commands.length} commands registered on guild ${GUILD_ID}.`);
   } else {
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: afriquiz.commands });
-    console.log(`✅ ${afriquiz.commands.length} commands registered globally.`);
+    const existing = await rest.get(Routes.applicationCommands(CLIENT_ID));
+    const entryPoint = existing.find(c => c.type === 4);
+    const body = [...afriquiz.commands, ...(entryPoint ? [entryPoint] : [])];
+    await rest.put(Routes.applicationCommands(CLIENT_ID), { body });
+    console.log(`✅ ${body.length} commands registered globally.`);
   }
 })().catch((err) => {
   console.error('❌ Registration failed:', err);
