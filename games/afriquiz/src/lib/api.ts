@@ -1,6 +1,6 @@
 import type { AnswerResult, Lang, LeaderboardEntry, QuizQuestion } from '../types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api/quiz';
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/neo/api/quiz';
 
 /* ── Demo fallback (offline / preview outside the VPS) ───────────── */
 
