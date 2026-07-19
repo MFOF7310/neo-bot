@@ -88,6 +88,7 @@ const T = {
   langSet:        { fr: '✅ Langue du serveur réglée sur **Français** 🇫🇷', en: '✅ Server language set to **English** 🇬🇧' },
   langNoPerm:     { fr: 'Seuls les administrateurs peuvent changer la langue du serveur.', en: 'Only admins can change the server language.' },
   error:          { fr: 'Oups, petit bug de mon côté… Réessaie dans un instant !', en: 'Oops, small hiccup on my side… Try again in a moment!' },
+  playFallback:   { fr: 'Je n\'arrive pas à lancer l\'activité ici… Ouvre un salon vocal et clique sur le bouton 🚀 Activités, ou réessaie dans un instant !', en: 'I can\'t launch the activity here… Join a voice channel and click the 🚀 Activities button, or try again in a moment!' },
 };
 
 function t(lang, key, vars = {}) {
@@ -485,6 +486,25 @@ async function cmdQuizLeaderboard(interaction) {
   await interaction.editReply({ embeds: [embed] });
 }
 
+/**
+ * /play — launch the AfriQuiz Activity straight from a text channel.
+ * Uses Discord's LAUNCH_ACTIVITY (type 12) interaction callback:
+ * Discord itself opens the Activity panel for the user, no voice
+ * channel required. Falls back to an ephemeral hint if the client
+ * or API refuses the callback.
+ */
+async function cmdPlay(interaction) {
+  const lang = getLang(interaction.guildId);
+  try {
+    await interaction.client.rest.post(
+      `/interactions/${interaction.id}/${interaction.token}/callback`,
+      { body: { type: 12 } }, // 12 = LAUNCH_ACTIVITY
+    );
+  } catch {
+    await interaction.reply({ content: t(lang, 'playFallback'), ephemeral: true }).catch(() => {});
+  }
+}
+
 async function cmdNeoLang(interaction) {
   const lang = getLang(interaction.guildId);
   if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -528,6 +548,9 @@ const commands = [
         .setDescription('Voir les stats de quelqu\'un d\'autre / View someone else\'s stats')
         .setRequired(false)),
   new SlashCommandBuilder()
+    .setName('play')
+    .setDescription('🚀 Lancer AfriQuiz ici, sans salon vocal / Launch AfriQuiz here, no voice channel needed'),
+  new SlashCommandBuilder()
     .setName('neo-lang')
     .setDescription('🌐 Langue du serveur / Server language')
     .addStringOption((o) =>
@@ -538,6 +561,7 @@ const commands = [
 ].map((c) => c.toJSON());
 
 const handlers = {
+  'play': cmdPlay,
   'quiz': cmdQuiz,
   'quiz-daily': cmdQuizDaily,
   'quiz-streak': cmdQuizStreak,
