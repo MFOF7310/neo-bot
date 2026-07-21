@@ -280,7 +280,7 @@ async function cmdQuiz(interaction) {
   });
 }
 
-async function launchQuiz(interaction, { daily = false, category = null, difficulty = null, forceLang = null }) {
+async function launchQuiz(interaction, { daily = false, category = null, difficulty = null, forceLang = null, fromLobby = false }) {
   const lang = forceLang || getLang(interaction.guildId);
 
   if (daily) {
@@ -299,11 +299,13 @@ async function launchQuiz(interaction, { daily = false, category = null, difficu
     return interaction.reply({ content: t(lang, 'noQuestion'), ephemeral: true });
   }
 
-  const msg = await interaction.reply({
+  const replyPayload = {
     embeds: [buildQuizEmbed(q, lang, daily)],
     components: buildAnswerRows(q, lang, daily),
-    fetchReply: true,
-  });
+  };
+  const msg = fromLobby
+    ? await interaction.editReply(replyPayload)
+    : await interaction.reply({ ...replyPayload, fetchReply: true });
 
   const session = {
     qid: q.id, daily, startTime: Date.now(), answered: false,
@@ -382,7 +384,7 @@ async function handleButton(interaction) {
 
         // Override guild lang with user's persistent lang
         const origGetLang = getLang;
-        await launchQuiz(interaction, { daily: false, category: lobby.category, difficulty: lobby.difficulty, forceLang: lobby.lang });
+        await launchQuiz(interaction, { daily: false, category: lobby.category, difficulty: lobby.difficulty, forceLang: lobby.lang, fromLobby: true });
         return;
       }
 

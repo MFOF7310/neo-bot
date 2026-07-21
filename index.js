@@ -77,7 +77,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isChatInputCommand()) {
       const handler = afriquiz.handlers[interaction.commandName];
       if (handler) return await handler(interaction);
-    } else if (interaction.isButton() && interaction.customId.startsWith('afq:')) {
+    } else if (interaction.isButton() && interaction.customId.startsWith('afq:') || interaction.customId.startsWith('lobby:')) {
       return await afriquiz.handleButton(interaction);
     }
   } catch (err) {

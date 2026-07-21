@@ -20,14 +20,7 @@ let sdk: DiscordSDK | null = null;
  */
 export async function initDiscord(): Promise<GameUser> {
   if (!isInsideDiscord()) {
-    return {
-      id: 'demo-user',
-      username: 'DemoPlayer',
-      avatar: null,
-      locale: navigator.language || 'fr',
-      guildId: 'demo-guild',
-      isDemo: true,
-    };
+    throw new Error('DISCORD_ONLY');
   }
 
   sdk = new DiscordSDK(CLIENT_ID);

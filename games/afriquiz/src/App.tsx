@@ -9,7 +9,7 @@ import type { AnswerResult, GameUser, Lang, LeaderboardEntry, QuizQuestion, Reve
 
 const QUESTION_DURATION_S = 30;
 
-type Phase = 'boot' | 'loading' | 'playing' | 'revealed';
+type Phase = 'boot' | 'loading' | 'playing' | 'revealed' | 'discord-only';
 type Tab = 'game' | 'board';
 
 export default function App() {
@@ -38,10 +38,13 @@ export default function App() {
     if (bootedRef.current) return;
     bootedRef.current = true;
     (async () => {
-      const u = await initDiscord().catch(() => ({
-        id: 'demo-user', username: 'DemoPlayer', avatar: null,
-        locale: navigator.language, guildId: 'demo-guild', isDemo: true,
-      }));
+      const u = await initDiscord().catch((err) => {
+        if (err?.message === 'DISCORD_ONLY') {
+          setPhase('discord-only');
+        }
+        return null;
+      });
+      if (!u) return;
       setUser(u);
       setLang(toLang(u.locale));
     })();
@@ -190,7 +193,22 @@ export default function App() {
       </nav>
 
       {/* content */}
-      {tab === 'game' ? (
+      {phase === 'discord-only' ? (
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 py-24 text-center px-6">
+          <span className="text-6xl">🎮</span>
+          <h2 className="text-xl font-bold text-white">Discord Only</h2>
+          <p className="text-sm text-white/60 max-w-xs">
+            AfriQuiz is only available inside Discord.<br />
+            Open it via the Neo bot Activity in your server.
+          </p>
+          <a
+            href="https://discord.com/invite/your-invite"
+            className="rounded-xl bg-[#5865F2] px-6 py-3 text-sm font-semibold text-white"
+          >
+            Open Discord
+          </a>
+        </main>
+      ) : tab === 'game' ? (
         <main className="flex flex-1 flex-col gap-4">
           {phase === 'loading' || !question ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 py-16">
