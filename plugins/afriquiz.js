@@ -482,9 +482,7 @@ async function handleButton(interaction) {
 
 /* ── Commands ───────────────────────────────────────────────────── */
 
-async function cmdQuiz(interaction) {
-  await cmdQuiz(interaction);
-}
+
 
 async function cmdQuizDaily(interaction) {
   await launchQuiz(interaction, { daily: true });
