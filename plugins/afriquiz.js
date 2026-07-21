@@ -106,8 +106,8 @@ const buttonCooldowns = new Map();
 
 /* ── Question helpers ───────────────────────────────────────────── */
 
-function pickQuestion(category) {
-  return stmts.randomQuestion.get({ cat: category || null });
+function pickQuestion(category, difficulty) {
+  return stmts.randomQuestion.get({ cat: category || null, diff: difficulty || null });
 }
 
 function qText(q, field, lang) {
@@ -160,7 +160,7 @@ function buildAnswerRows(q, lang, daily, reveal = null, chosenLetter = null) {
 
 /* ── Quiz flow ──────────────────────────────────────────────────── */
 
-async function launchQuiz(interaction, { daily = false, category = null }) {
+async function launchQuiz(interaction, { daily = false, category = null, difficulty = null }) {
   const lang = getLang(interaction.guildId);
 
   if (daily) {
@@ -174,7 +174,7 @@ async function launchQuiz(interaction, { daily = false, category = null }) {
     }
   }
 
-  const q = pickQuestion(category);
+  const q = pickQuestion(category, difficulty);
   if (!q) {
     return interaction.reply({ content: t(lang, 'noQuestion'), ephemeral: true });
   }
@@ -314,7 +314,8 @@ async function handleButton(interaction) {
 
 async function cmdQuiz(interaction) {
   const category = interaction.options.getString('categorie') || interaction.options.getString('category');
-  await launchQuiz(interaction, { daily: false, category });
+  const difficulty = interaction.options.getString('difficulte') || interaction.options.getString('difficulty');
+  await launchQuiz(interaction, { daily: false, category, difficulty });
 }
 
 async function cmdQuizDaily(interaction) {
@@ -530,6 +531,15 @@ const commands = [
       o.setName('categorie')
         .setDescription('Catégorie (optionnel) / Category (optional)')
         .addChoices(...categoryChoices)
+        .setRequired(false))
+    .addStringOption((o) =>
+      o.setName('difficulte')
+        .setDescription('Difficulté / Difficulty')
+        .addChoices(
+          { name: '🟢 Facile / Easy (5 pts)', value: 'easy' },
+          { name: '🟡 Moyen / Medium (10 pts)', value: 'medium' },
+          { name: '🔴 Difficile / Hard (20 pts)', value: 'hard' },
+        )
         .setRequired(false)),
   new SlashCommandBuilder()
     .setName('quiz-daily')

@@ -33,14 +33,25 @@ if (!TOKEN || !CLIENT_ID) {
 
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(TOKEN);
-  const body = afriquiz.commands;
+  const slashBody = afriquiz.commands.map(c => c.toJSON ? c.toJSON() : c);
   try {
+    // Fetch existing commands to preserve Entry Point (type 4) command
+    let existing = [];
+    if (GUILD_ID) {
+      existing = await rest.get(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID));
+    } else {
+      existing = await rest.get(Routes.applicationCommands(CLIENT_ID));
+    }
+    // Keep any Entry Point commands Discord manages
+    const entryPoints = existing.filter(c => c.type === 4);
+    const body = [...slashBody, ...entryPoints];
+
     if (GUILD_ID) {
       await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body });
-      console.log(`[NEO] ✅ ${body.length} commands registered on guild ${GUILD_ID} (instant).`);
+      console.log(`[NEO] ✅ ${slashBody.length} commands registered on guild ${GUILD_ID} (instant).`);
     } else {
       await rest.put(Routes.applicationCommands(CLIENT_ID), { body });
-      console.log(`[NEO] ✅ ${body.length} commands registered globally (may take up to 1h).`);
+      console.log(`[NEO] ✅ ${slashBody.length} commands registered globally (may take up to 1h).`);
     }
   } catch (err) {
     console.error('[NEO] ⚠️  Command registration failed (bot will still run):', err.message);
