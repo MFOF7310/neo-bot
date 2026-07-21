@@ -84,6 +84,18 @@ const T = {
   statsCorrect:   { fr: 'Bonnes réponses', en: 'Correct answers' },
   statsAccuracy:  { fr: 'Précision', en: 'Accuracy' },
   statsBestCat:   { fr: 'Meilleure catégorie', en: 'Best category' },
+  lobbyTitle:    { fr: '🎮 AfriQuiz — Configuration', en: '🎮 AfriQuiz — Setup' },
+  lobbyDesc:     { fr: 'Configure ta partie puis clique sur **▶ Démarrer** !', en: 'Configure your game then click **▶ Start**!' },
+  lobbyCategory: { fr: '🌍 Catégorie', en: '🌍 Category' },
+  lobbyDiff:     { fr: '⚡ Difficulté', en: '⚡ Difficulty' },
+  lobbyLang:     { fr: '🌐 Langue', en: '🌐 Language' },
+  lobbyAny:      { fr: 'Aléatoire', en: 'Random' },
+  lobbyStart:    { fr: '▶ Démarrer', en: '▶ Start' },
+  lobbyTimeout:  { fr: '⌛ Lobby expiré. Lance `/quiz` pour recommencer.', en: '⌛ Lobby expired. Run `/quiz` to try again.' },
+  countdown3:    { fr: '⏳ Préparation... **3**', en: '⏳ Getting ready... **3**' },
+  countdown2:    { fr: '⏳ Préparation... **2**', en: '⏳ Getting ready... **2**' },
+  countdown1:    { fr: '⏳ Préparation... **1**', en: '⏳ Getting ready... **1**' },
+  countdownGo:   { fr: '🚀 C\'est parti !', en: '🚀 Here we go!' },
   statsNone:      { fr: 'Pas encore de partie jouée ! Lance `/quiz` pour commencer 🎮', en: 'No games played yet! Run `/quiz` to get started 🎮' },
   langSet:        { fr: '✅ Langue du serveur réglée sur **Français** 🇫🇷', en: '✅ Server language set to **English** 🇬🇧' },
   langNoPerm:     { fr: 'Seuls les administrateurs peuvent changer la langue du serveur.', en: 'Only admins can change the server language.' },
@@ -101,6 +113,18 @@ function t(lang, key, vars = {}) {
 
 /** messageId -> { qid, daily, startTime, answered, correctLetter, timeout } */
 const sessions = new Map();
+const lobbies = new Map(); // messageId -> { userId, category, difficulty, lang, timeout }
+
+function getUserLang(guildId, userId, defaultLang) {
+  try {
+    const row = stmts.getUserLang?.get(userId, guildId);
+    return row?.lang || defaultLang;
+  } catch { return defaultLang; }
+}
+
+function setUserLang(guildId, userId, lang) {
+  try { stmts.setUserLang?.run(lang, userId, guildId); } catch {}
+}
 /** "userId:customId" -> timestamp (1.2 s anti-spam) */
 const buttonCooldowns = new Map();
 
@@ -160,8 +184,104 @@ function buildAnswerRows(q, lang, daily, reveal = null, chosenLetter = null) {
 
 /* ── Quiz flow ──────────────────────────────────────────────────── */
 
-async function launchQuiz(interaction, { daily = false, category = null, difficulty = null }) {
-  const lang = getLang(interaction.guildId);
+function buildLobbyEmbed(lang, category, difficulty) {
+  const catLabel = category ? (CATEGORIES[category]?.[lang] || category) : t(lang, 'lobbyAny');
+  const diffLabel = difficulty ? DIFF_LABEL[difficulty][lang] : t(lang, 'lobbyAny');
+  return new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle(t(lang, 'lobbyTitle'))
+    .setDescription(t(lang, 'lobbyDesc'))
+    .addFields(
+      { name: t(lang, 'lobbyCategory'), value: catLabel, inline: true },
+      { name: t(lang, 'lobbyDiff'), value: diffLabel, inline: true },
+      { name: t(lang, 'lobbyLang'), value: lang === 'fr' ? '🇫🇷 Français' : '🇬🇧 English', inline: true },
+    )
+    .setFooter({ text: 'NEO • AfriQuiz' });
+}
+
+function buildLobbyComponents(lang, category, difficulty) {
+  const categoryChoicesLobby = [
+    { label: t(lang, 'lobbyAny'), value: 'any' },
+    ...Object.entries(CATEGORIES).map(([v, l]) => ({ label: l[lang] || l.en, value: v })),
+  ];
+  const diffChoices = [
+    { label: t(lang, 'lobbyAny'), value: 'any' },
+    { label: `🟢 ${DIFF_LABEL.easy[lang]} (5pts)`, value: 'easy' },
+    { label: `🟡 ${DIFF_LABEL.medium[lang]} (10pts)`, value: 'medium' },
+    { label: `🔴 ${DIFF_LABEL.hard[lang]} (20pts)`, value: 'hard' },
+  ];
+
+  const row1 = new ActionRowBuilder().addComponents(
+    categoryChoicesLobby.map(c =>
+      new ButtonBuilder()
+        .setCustomId(`lobby:cat:${c.value}`)
+        .setLabel(c.label.slice(0, 80))
+        .setStyle(category === c.value || (c.value === 'any' && !category)
+          ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    ).slice(0, 5)
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    diffChoices.map(d =>
+      new ButtonBuilder()
+        .setCustomId(`lobby:diff:${d.value}`)
+        .setLabel(d.label.slice(0, 80))
+        .setStyle(difficulty === d.value || (d.value === 'any' && !difficulty)
+          ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    )
+  );
+
+  const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('lobby:lang:fr')
+      .setLabel('🇫🇷 Français')
+      .setStyle(lang === 'fr' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('lobby:lang:en')
+      .setLabel('🇬🇧 English')
+      .setStyle(lang === 'en' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('lobby:start')
+      .setLabel(t(lang, 'lobbyStart'))
+      .setStyle(ButtonStyle.Success),
+  );
+
+  return [row1, row2, row3];
+}
+
+async function cmdQuiz(interaction) {
+  const guildLang = getLang(interaction.guildId);
+  const userLang = getUserLang(interaction.guildId, interaction.user.id, guildLang);
+  const category = interaction.options.getString('categorie') || interaction.options.getString('category') || null;
+  const difficulty = interaction.options.getString('difficulte') || interaction.options.getString('difficulty') || null;
+
+  const msg = await interaction.reply({
+    embeds: [buildLobbyEmbed(userLang, category, difficulty)],
+    components: buildLobbyComponents(userLang, category, difficulty),
+    fetchReply: true,
+  });
+
+  const lobbyTimeout = setTimeout(async () => {
+    lobbies.delete(msg.id);
+    try {
+      await msg.edit({
+        embeds: [new EmbedBuilder().setColor(COLORS.red).setDescription(t(userLang, 'lobbyTimeout'))],
+        components: [],
+      });
+    } catch {}
+  }, 30_000);
+
+  lobbies.set(msg.id, {
+    userId: interaction.user.id,
+    category,
+    difficulty,
+    lang: userLang,
+    timeout: lobbyTimeout,
+  });
+}
+
+async function launchQuiz(interaction, { daily = false, category = null, difficulty = null, forceLang = null }) {
+  const lang = forceLang || getLang(interaction.guildId);
 
   if (daily) {
     const today = new Date().toISOString().slice(0, 10);
@@ -224,6 +344,56 @@ async function expireQuiz(client, messageId) {
 
 async function handleButton(interaction) {
   try {
+    // ── Lobby buttons ──
+    if (interaction.customId.startsWith('lobby:')) {
+      const lobby = lobbies.get(interaction.message.id);
+      if (!lobby) return interaction.reply({ content: '⌛', ephemeral: true });
+      if (interaction.user.id !== lobby.userId) {
+        return interaction.reply({ content: '🔒 Only the person who started this lobby can configure it.', ephemeral: true });
+      }
+
+      const [, action, value] = interaction.customId.split(':');
+
+      if (action === 'cat') {
+        lobby.category = value === 'any' ? null : value;
+      } else if (action === 'diff') {
+        lobby.difficulty = value === 'any' ? null : value;
+      } else if (action === 'lang') {
+        lobby.lang = value;
+        setUserLang(interaction.guildId, interaction.user.id, value);
+      } else if (action === 'start') {
+        clearTimeout(lobby.timeout);
+        lobbies.delete(interaction.message.id);
+
+        // Countdown
+        const cd = [
+          t(lobby.lang, 'countdown3'),
+          t(lobby.lang, 'countdown2'),
+          t(lobby.lang, 'countdown1'),
+          t(lobby.lang, 'countdownGo'),
+        ];
+        const countdownEmbed = new EmbedBuilder().setColor(COLORS.gold).setDescription(cd[0]);
+        await interaction.update({ embeds: [countdownEmbed], components: [] });
+        for (let i = 1; i < cd.length; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.gold).setDescription(cd[i])], components: [] });
+        }
+        await new Promise(r => setTimeout(r, 600));
+
+        // Override guild lang with user's persistent lang
+        const origGetLang = getLang;
+        await launchQuiz(interaction, { daily: false, category: lobby.category, difficulty: lobby.difficulty, forceLang: lobby.lang });
+        return;
+      }
+
+      // Update lobby embed
+      await interaction.update({
+        embeds: [buildLobbyEmbed(lobby.lang, lobby.category, lobby.difficulty)],
+        components: buildLobbyComponents(lobby.lang, lobby.category, lobby.difficulty),
+      });
+      return;
+    }
+
     const [, qid, letter, flag] = interaction.customId.split(':');
     const session = sessions.get(interaction.message.id);
 
@@ -313,9 +483,7 @@ async function handleButton(interaction) {
 /* ── Commands ───────────────────────────────────────────────────── */
 
 async function cmdQuiz(interaction) {
-  const category = interaction.options.getString('categorie') || interaction.options.getString('category');
-  const difficulty = interaction.options.getString('difficulte') || interaction.options.getString('difficulty');
-  await launchQuiz(interaction, { daily: false, category, difficulty });
+  await cmdQuiz(interaction);
 }
 
 async function cmdQuizDaily(interaction) {
