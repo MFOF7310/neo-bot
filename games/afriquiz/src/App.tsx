@@ -5,11 +5,12 @@ import Leaderboard from './components/Leaderboard';
 import { initDiscord, resolveName } from './lib/discord';
 import { fetchLeaderboard, fetchQuestion, postAnswer } from './lib/api';
 import { randomOf, t, toLang } from './i18n';
+import Lobby from './components/Lobby';
 import type { AnswerResult, GameUser, Lang, LeaderboardEntry, QuizQuestion, Reveal } from './types';
 
 const QUESTION_DURATION_S = 30;
 
-type Phase = 'boot' | 'loading' | 'playing' | 'revealed' | 'discord-only';
+type Phase = 'boot' | 'lobby' | 'loading' | 'playing' | 'revealed' | 'discord-only';
 type Tab = 'game' | 'board';
 
 export default function App() {
@@ -22,6 +23,8 @@ export default function App() {
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [round, setRound] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
 
   const [totalPoints, setTotalPoints] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -47,15 +50,16 @@ export default function App() {
       if (!u) return;
       setUser(u);
       setLang(toLang(u.locale));
+      setPhase('lobby');
     })();
   }, []);
 
   const loadQuestion = useCallback(
-    async (l: Lang) => {
+    async (l: Lang, cat = 'all', diff = 'all') => {
       setPhase('loading');
       setReveal(null);
       setResult(null);
-      const q = await fetchQuestion(l);
+      const q = await fetchQuestion(l, cat === 'all' ? undefined : cat, diff === 'all' ? undefined : diff);
       setQuestion(q);
       questionStartRef.current = Date.now();
       setRound((r) => r + 1);
@@ -64,10 +68,7 @@ export default function App() {
     [],
   );
 
-  /* first question once we know the language */
-  useEffect(() => {
-    if (user && phase === 'boot') void loadQuestion(lang);
-  }, [user, phase, lang, loadQuestion]);
+  /* first question fires only after lobby start */
 
   /* ── answer flow ──────────────────────────────────────────────── */
   const handleAnswer = useCallback(
@@ -134,7 +135,27 @@ export default function App() {
       .finally(() => setBoardLoading(false));
   }, [tab, user]);
 
+  /* ── lobby start ──────────────────────────────────────────────── */
+  const handleLobbyStart = ({ lang: l, category, difficulty }: { lang: Lang; category: string; difficulty: string }) => {
+    setLang(l);
+    setSelectedCategory(category);
+    setSelectedDifficulty(difficulty);
+    void loadQuestion(l, category, difficulty);
+  };
+
   /* ── render ───────────────────────────────────────────────────── */
+
+  if (phase === 'lobby' && user) {
+    return (
+      <Shell>
+        <Lobby
+          lang={lang}
+          username={user.username}
+          onStart={handleLobbyStart}
+        />
+      </Shell>
+    );
+  }
 
   if (!user) {
     return (
